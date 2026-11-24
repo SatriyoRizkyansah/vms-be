@@ -1,12 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsNotEmpty, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class CreateDeviceDto {
-  @ApiProperty({ example: 'Ruangan Telematika' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(160)
-  room_name: string;
+  @ApiProperty({ format: 'uuid', description: 'Door the smart lock is installed on' })
+  @IsUUID()
+  door_id: string;
 
   @ApiProperty({ example: 'tuya-device-id' })
   @IsString()

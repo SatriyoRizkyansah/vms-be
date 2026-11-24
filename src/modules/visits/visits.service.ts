@@ -64,6 +64,22 @@ const visitSelect = {
       room_name: true,
       connection_status: true,
       battery_level: true,
+      door: {
+        select: {
+          name: true,
+          room: {
+            select: {
+              name: true,
+              floor: {
+                select: {
+                  name: true,
+                  building: { select: { name: true } },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   },
   approved_by: { select: { id: true, full_name: true } },

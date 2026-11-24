@@ -5,14 +5,14 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  IsUUID,
 } from 'class-validator';
 
 export class UpdateDeviceDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()
-  @IsString()
-  @MaxLength(160)
-  room_name?: string;
+  @IsUUID()
+  door_id?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

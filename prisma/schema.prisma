@@ -82,6 +82,7 @@ model User {
 
 model RoomDevice {
   id                String                 @id @default(uuid()) @db.Uuid
+  door_id           String?                @unique @db.Uuid
   room_name         String                 @db.VarChar(160)
   tuya_device_id    String                 @unique @db.VarChar(120)
   pin_length        Int                    @default(7)
@@ -92,11 +93,79 @@ model RoomDevice {
   created_at        DateTime               @default(now()) @db.Timestamptz(6)
   updated_at        DateTime               @updatedAt @db.Timestamptz(6)
 
+  door          Door?                  @relation(fields: [door_id], references: [id], onDelete: SetNull)
   visits        VisitRequest[]
   audit_logs    DoorAuditLog[]
   notifications NotificationDelivery[]
 
   @@map("room_devices")
+}
+
+model Building {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String   @db.VarChar(160)
+  code       String   @unique @db.VarChar(40)
+  address    String?  @db.VarChar(255)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @updatedAt @db.Timestamptz(6)
+
+  floors BuildingFloor[]
+
+  @@index([is_active, name])
+  @@map("buildings")
+}
+
+model BuildingFloor {
+  id           String   @id @default(uuid()) @db.Uuid
+  building_id  String   @db.Uuid
+  name         String   @db.VarChar(80)
+  floor_number Int?
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @updatedAt @db.Timestamptz(6)
+
+  building Building @relation(fields: [building_id], references: [id], onDelete: Restrict)
+  rooms    Room[]
+
+  @@unique([building_id, name])
+  @@index([building_id, floor_number])
+  @@map("building_floors")
+}
+
+model Room {
+  id          String   @id @default(uuid()) @db.Uuid
+  floor_id    String   @db.Uuid
+  name        String   @db.VarChar(160)
+  code        String?  @db.VarChar(40)
+  description String?  @db.VarChar(500)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @updatedAt @db.Timestamptz(6)
+
+  floor BuildingFloor @relation(fields: [floor_id], references: [id], onDelete: Restrict)
+  doors Door[]
+
+  @@unique([floor_id, name])
+  @@index([floor_id, is_active])
+  @@map("rooms")
+}
+
+model Door {
+  id         String   @id @default(uuid()) @db.Uuid
+  room_id    String   @db.Uuid
+  name       String   @db.VarChar(120)
+  code       String?  @db.VarChar(40)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @updatedAt @db.Timestamptz(6)
+
+  room    Room         @relation(fields: [room_id], references: [id], onDelete: Restrict)
+  devices RoomDevice[]
+
+  @@unique([room_id, name])
+  @@index([room_id, is_active])
+  @@map("doors")
 }
 
 model VisitRequest {

@@ -4,6 +4,7 @@ import { HealthController } from './health.controller';
 import { AuthModule } from './modules/auth/auth.module';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { DevicesModule } from './modules/devices/devices.module';
+import { LocationsModule } from './modules/locations/locations.module';
 import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -18,6 +19,7 @@ import { VisitsModule } from './modules/visits/visits.module';
     UsersModule,
     VisitsModule,
     DevicesModule,
+    LocationsModule,
     SettingsModule,
     IntegrationsModule,
     AuditLogsModule,
