@@ -1,6 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { VisitStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
+  IsEnum,
   IsInt,
   IsOptional,
   IsString,
@@ -9,7 +11,7 @@ import {
   Min,
 } from 'class-validator';
 
-export class ListExampleItemsDto {
+export class ListVisitsDto {
   @ApiPropertyOptional({ default: 1, minimum: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -25,7 +27,12 @@ export class ListExampleItemsDto {
   @Max(100)
   limit = 20;
 
-  @ApiPropertyOptional({ example: 'badge' })
+  @ApiPropertyOptional({ enum: VisitStatus })
+  @IsOptional()
+  @IsEnum(VisitStatus)
+  status?: VisitStatus;
+
+  @ApiPropertyOptional({ example: 'VMS-20261201' })
   @IsOptional()
   @IsString()
   @MaxLength(120)

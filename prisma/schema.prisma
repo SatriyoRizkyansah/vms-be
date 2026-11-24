@@ -7,12 +7,221 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model ExampleItem {
-  id          String   @id @default(uuid()) @db.Uuid
-  title       String   @db.VarChar(120)
-  description String?  @db.VarChar(500)
-  created_at  DateTime @default(now()) @db.Timestamptz(6)
-  updated_at  DateTime @updatedAt @db.Timestamptz(6)
+enum UserRole {
+  PIC
+  ADMIN
+  AUDITOR
+}
 
-  @@map("example_items")
+enum VisitStatus {
+  PENDING_APPROVAL
+  APPROVED
+  PROVISIONED
+  OFFLINE_FALLBACK
+  CHECKED_IN
+  REJECTED
+  COMPLETED
+  REVOKED
+  EXPIRED
+}
+
+enum CredentialType {
+  ONLINE_TEMP
+  OFFLINE_TEMP
+  RFID_BACKUP
+}
+
+enum DeviceConnectionStatus {
+  ONLINE
+  OFFLINE
+  UNKNOWN
+}
+
+enum DoorEventType {
+  UNLOCK_PIN
+  UNLOCK_RFID
+  WRONG_PIN
+  TAMPER
+  LOW_BATTERY
+  DEVICE_ONLINE
+  DEVICE_OFFLINE
+  OTHER
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  nip_username  String   @unique @db.VarChar(80)
+  full_name     String   @db.VarChar(160)
+  email         String   @unique @db.VarChar(254)
+  phone_number  String?  @db.VarChar(32)
+  password_hash String   @db.VarChar(255)
+  role          UserRole @default(PIC)
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @updatedAt @db.Timestamptz(6)
+
+  hosted_visits     VisitRequest[]   @relation("VisitPIC")
+  registered_visits VisitRequest[]   @relation("VisitRegistrar")
+  approved_visits   VisitRequest[]   @relation("VisitApprover")
+  status_changes    VisitStatusLog[]
+
+  @@index([role, is_active])
+  @@map("users")
+}
+
+model RoomDevice {
+  id                String                 @id @default(uuid()) @db.Uuid
+  room_name         String                 @db.VarChar(160)
+  tuya_device_id    String                 @unique @db.VarChar(120)
+  pin_length        Int                    @default(7)
+  battery_level     Int?
+  connection_status DeviceConnectionStatus @default(UNKNOWN)
+  last_synced_at    DateTime?              @db.Timestamptz(6)
+  is_active         Boolean                @default(true)
+  created_at        DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime               @updatedAt @db.Timestamptz(6)
+
+  visits        VisitRequest[]
+  audit_logs    DoorAuditLog[]
+  notifications NotificationDelivery[]
+
+  @@map("room_devices")
+}
+
+model VisitRequest {
+  id                      String      @id @default(uuid()) @db.Uuid
+  visit_code              String      @unique @db.VarChar(32)
+  visitor_name            String      @db.VarChar(160)
+  visitor_identity_no     String      @db.VarChar(80)
+  visitor_institution     String      @db.VarChar(160)
+  visitor_phone           String      @db.VarChar(32)
+  visitor_email           String      @db.VarChar(254)
+  purpose                 String      @db.Text
+  pic_user_id             String      @db.Uuid
+  room_device_id          String      @db.Uuid
+  registered_by_id        String?     @db.Uuid
+  approved_by_id          String?     @db.Uuid
+  scheduled_start         DateTime    @db.Timestamptz(6)
+  scheduled_end           DateTime    @db.Timestamptz(6)
+  is_emergency            Boolean     @default(false)
+  status                  VisitStatus @default(PENDING_APPROVAL)
+  provisioning_error      String?     @db.VarChar(500)
+  provisioning_started_at DateTime?   @db.Timestamptz(6)
+  rejection_reason        String?     @db.VarChar(500)
+  expiry_reminder_sent_at DateTime?   @db.Timestamptz(6)
+  approved_at             DateTime?   @db.Timestamptz(6)
+  checked_in_at           DateTime?   @db.Timestamptz(6)
+  completed_at            DateTime?   @db.Timestamptz(6)
+  created_at              DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime    @updatedAt @db.Timestamptz(6)
+
+  pic            User                   @relation("VisitPIC", fields: [pic_user_id], references: [id], onDelete: Restrict)
+  registered_by  User?                  @relation("VisitRegistrar", fields: [registered_by_id], references: [id], onDelete: SetNull)
+  approved_by    User?                  @relation("VisitApprover", fields: [approved_by_id], references: [id], onDelete: SetNull)
+  room           RoomDevice             @relation(fields: [room_device_id], references: [id], onDelete: Restrict)
+  credential     AccessCredential?
+  audit_logs     DoorAuditLog[]
+  notifications  NotificationDelivery[]
+  status_history VisitStatusLog[]
+
+  @@index([status, scheduled_start])
+  @@index([pic_user_id, created_at])
+  @@index([visitor_identity_no])
+  @@map("visit_requests")
+}
+
+model AccessCredential {
+  id               String         @id @default(uuid()) @db.Uuid
+  visit_request_id String         @unique @db.Uuid
+  tuya_password_id String?        @db.VarChar(100)
+  pin_code_masked  String         @db.VarChar(16)
+  pin_ciphertext   String         @db.Text
+  pin_iv           String         @db.VarChar(64)
+  pin_auth_tag     String         @db.VarChar(64)
+  pin_type         CredentialType @default(ONLINE_TEMP)
+  effective_from   DateTime       @db.Timestamptz(6)
+  effective_until  DateTime       @db.Timestamptz(6)
+  is_revoked       Boolean        @default(false)
+  revoked_at       DateTime?      @db.Timestamptz(6)
+  created_at       DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime       @updatedAt @db.Timestamptz(6)
+
+  visit VisitRequest @relation(fields: [visit_request_id], references: [id], onDelete: Restrict)
+
+  @@index([tuya_password_id])
+  @@index([effective_until, is_revoked])
+  @@map("access_credentials")
+}
+
+model DoorAuditLog {
+  id                  String        @id @default(uuid()) @db.Uuid
+  event_key           String?       @unique @db.VarChar(160)
+  room_device_id      String        @db.Uuid
+  visit_request_id    String?       @db.Uuid
+  event_type          DoorEventType
+  tuya_credential_ref String?       @db.VarChar(100)
+  raw_payload         Json
+  occurred_at         DateTime      @db.Timestamptz(6)
+  created_at          DateTime      @default(now()) @db.Timestamptz(6)
+
+  room  RoomDevice    @relation(fields: [room_device_id], references: [id], onDelete: Restrict)
+  visit VisitRequest? @relation(fields: [visit_request_id], references: [id], onDelete: Restrict)
+
+  @@index([occurred_at])
+  @@index([event_type, occurred_at])
+  @@index([visit_request_id, occurred_at])
+  @@map("door_audit_logs")
+}
+
+model VisitStatusLog {
+  id               String       @id @default(uuid()) @db.Uuid
+  visit_request_id String       @db.Uuid
+  from_status      VisitStatus?
+  to_status        VisitStatus
+  changed_by_id    String?      @db.Uuid
+  reason           String?      @db.VarChar(500)
+  created_at       DateTime     @default(now()) @db.Timestamptz(6)
+
+  visit      VisitRequest @relation(fields: [visit_request_id], references: [id], onDelete: Restrict)
+  changed_by User?        @relation(fields: [changed_by_id], references: [id], onDelete: SetNull)
+
+  @@index([visit_request_id, created_at])
+  @@map("visit_status_logs")
+}
+
+model SystemSetting {
+  key        String   @id @db.VarChar(100)
+  value      String   @db.VarChar(500)
+  updated_at DateTime @updatedAt @db.Timestamptz(6)
+
+  @@map("system_settings")
+}
+
+model NotificationDelivery {
+  id               String              @id @default(uuid()) @db.Uuid
+  visit_request_id String?             @db.Uuid
+  room_device_id   String?             @db.Uuid
+  channel          NotificationChannel
+  recipient        String              @db.VarChar(254)
+  status           NotificationStatus  @default(PENDING)
+  error_message    String?             @db.VarChar(500)
+  sent_at          DateTime?           @db.Timestamptz(6)
+  created_at       DateTime            @default(now()) @db.Timestamptz(6)
+
+  visit  VisitRequest? @relation(fields: [visit_request_id], references: [id], onDelete: Restrict)
+  device RoomDevice?   @relation(fields: [room_device_id], references: [id], onDelete: Restrict)
+
+  @@index([status, created_at])
+  @@map("notification_deliveries")
 }
